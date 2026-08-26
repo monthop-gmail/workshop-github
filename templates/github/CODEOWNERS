@@ -1,0 +1,26 @@
+# CODEOWNERS — ใครต้องรู้เมื่อไฟล์ตรงนี้ถูกแตะ
+#
+# บรรทัดล่างชนะบรรทัดบน → ตัวที่เจาะจงที่สุดอยู่ล่างสุด
+# ใช้ team (@myorg/team-x) ไม่ใช่ชื่อคน — คนย้ายทีมได้ ทีมไม่หายไป
+# team ต้องมีสิทธิ์ write บน repo ไม่งั้นบรรทัดนั้นจะเงียบไม่มีผล
+#
+# ตรวจ syntax:  gh api repos/OWNER/REPO/codeowners/errors --jq '.errors'
+
+# ค่าเริ่มต้นของทั้ง repo
+*                           @myorg/team-backend
+
+# CI, workflow, สิทธิ์ต่าง ๆ — เปลี่ยนแล้วกระทบทุกคน
+/.github/                   @myorg/team-platform
+
+# infra / deployment
+/infra/                     @myorg/team-platform
+/compose/                   @myorg/team-platform
+/Dockerfile                 @myorg/team-platform
+
+# จุดที่เป็น contract ระหว่างทีม — ต้องมีคนจากทั้งสองฝั่ง approve
+/api/schemas/               @myorg/team-backend @myorg/team-frontend
+/migrations/                @myorg/team-backend @myorg/team-data
+/openapi.yaml               @myorg/team-backend @myorg/team-frontend
+
+# ตัวอย่างเฉพาะโดเมน (Odoo)
+# /addons/account_*/        @myorg/team-erp @myorg/team-finance

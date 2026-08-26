@@ -1,0 +1,98 @@
+# ก๊อปไปวางที่ .github/workflows/ci.yml
+#
+# required status check ที่ต้องตั้งใน ruleset คือ "ci" (job สุดท้าย) เท่านั้น
+# workflow นี้ build อย่างเดียว ไม่ push image — การ push ควรอยู่ใน workflow แยกที่ผูกกับ tag
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: หา Dockerfile ทั้งหมด
+        id: find
+        run: |
+          files=$(find . -name 'Dockerfile*' -not -path './.git/*' | tr '\n' ' ')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+          echo "เจอ: ${files:-ไม่มี}"
+
+      - name: hadolint
+        if: steps.find.outputs.files != ''
+        uses: hadolint/hadolint-action@v3.5.0
+        with:
+          recursive: true
+          # DL3008/DL3018 = บังคับ pin เวอร์ชันของ apt/apk — เปิดไว้ ปิดเมื่อจำเป็นจริง
+          failure-threshold: warning
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: ตรวจไฟล์ compose ทุกไฟล์
+        run: |
+          shopt -s nullglob
+          files=(compose/*.yml compose/*.yaml docker-compose*.yml docker-compose*.yaml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "ไม่มีไฟล์ compose — ข้าม"
+            exit 0
+          fi
+          status=0
+          for f in "${files[@]}"; do
+            echo "--- $f"
+            if ! docker compose -f "$f" config >/dev/null; then
+              echo "::error file=$f::compose config ไม่ผ่าน"
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: เตือนถ้ามี image ที่ใช้ tag latest
+        run: |
+          if grep -rnE '^\s*image:\s*\S+:latest\s*$' --include='*.yml' --include='*.yaml' . ; then
+            echo "::error::ห้ามใช้ tag latest — pin เวอร์ชันให้ชัดเจน"
+            exit 1
+          fi
+          echo "ไม่พบ image ที่ใช้ latest"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: build image (ไม่ push)
+        run: |
+          if [ ! -f Dockerfile ]; then
+            echo "ไม่มี Dockerfile ที่ราก — ข้าม"
+            exit 0
+          fi
+          docker buildx build --load -t ci-check:${{ github.sha }} .
+
+  # ---- gate: required status check ตัวเดียวของ repo นี้ ----
+  ci:
+    if: always()
+    needs: [lint, compose, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: สรุปผล
+        run: |
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "::error::มี job ก่อนหน้าไม่ผ่าน — ดูรายละเอียดที่ job ที่แดง"
+            exit 1
+          fi
+          echo "ผ่านทั้งหมด"

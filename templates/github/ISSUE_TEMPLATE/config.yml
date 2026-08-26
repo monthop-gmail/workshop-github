@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: คำถามทั่วไป
+    url: https://github.com/myorg/my-service/discussions
+    about: ถ้ายังไม่แน่ใจว่าเป็นบั๊กหรือไม่ ถามที่นี่ก่อน

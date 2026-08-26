@@ -1,0 +1,61 @@
+# รีวิว PR อัตโนมัติด้วย Claude
+#
+# ต้องมี secret ANTHROPIC_API_KEY
+# คอมเมนต์จาก workflow นี้ไม่ใช่ approval และไม่ใช่ตัวแทนคนรีวิว — อ่าน docs/06-claude-on-github.md
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    # จำกัดเฉพาะโฟลเดอร์ที่สำคัญ เพื่อไม่ให้เสียเงินรีวิวทุก PR
+    # ลบ paths ออกถ้าอยากให้รีวิวทุกอย่าง
+    paths:
+      - "src/**"
+      - "app/**"
+      - "addons/**"
+      - "api/**"
+      - "migrations/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    # ข้าม PR ของ bot (dependabot, renovate) และ draft
+    if: github.event.pull_request.user.type != 'Bot' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            อ่าน CLAUDE.md ของ repo นี้ก่อน แล้วรีวิว diff ของ PR นี้
+            รายงานเฉพาะสิ่งที่มั่นใจว่าเป็นปัญหาจริง — อย่าเดา อย่าคอมเมนต์เรื่องสไตล์ที่ linter ตรวจอยู่แล้ว
+
+            เรียงตามลำดับความสำคัญนี้:
+            1. ความถูกต้อง — edge case: null, ค่าว่าง, ค่าติดลบ, ข้อมูลใหญ่, การเรียกซ้อน
+            2. ความปลอดภัย — input จากภายนอกไม่ได้ validate, SQL ที่ต่อจาก string, secret ที่ hardcode,
+               error ที่ตอบกลับผู้ใช้พร้อม stack trace
+            3. ผลกระทบข้าม repo — เปลี่ยน API response, schema, ชื่อ field, หรือพฤติกรรมที่ repo อื่นพึ่งพาอยู่
+               ถ้าเจอ ให้บอกชัดว่าเป็น breaking change และใครน่าจะได้รับผลกระทบ
+            4. error ที่ถูกกลืนเงียบ (catch แล้วไม่ทำอะไร) และ TODO/placeholder ที่หลุดมา
+            5. test — logic สำคัญที่เพิ่มเข้ามาแต่ไม่มี test ครอบ
+
+            รูปแบบคอมเมนต์: ติดป้ายทุกอันว่า blocking / suggestion / question
+            ใช้ inline comment สำหรับจุดที่ระบุบรรทัดได้ ที่เหลือรวมไว้ในคอมเมนต์เดียว
+            ตอบเป็นภาษาไทย ถ้าไม่เจออะไรที่เข้าข่าย ให้บอกสั้น ๆ ว่าไม่เจอ
+
+          # จำกัดเครื่องมือ — workflow นี้ต้องอ่านและคอมเมนต์เท่านั้น ห้ามแก้โค้ด
+          claude_args: |
+            --model claude-opus-5
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

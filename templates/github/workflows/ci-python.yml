@@ -1,0 +1,117 @@
+# ก๊อปไปวางที่ .github/workflows/ci.yml
+#
+# required status check ที่ต้องตั้งใน ruleset คือ "ci" (job สุดท้าย) เท่านั้น
+# ชื่อ job ข้างในเปลี่ยนได้อิสระโดยไม่ต้องแก้ branch protection
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: ติดตั้ง ruff
+        run: pip install ruff
+
+      - name: ตรวจโค้ด
+        run: ruff check --output-format=github .
+
+      - name: ตรวจ format
+        run: ruff format --check .
+
+      # ใช้ได้กับทุก repo Python — ถ้าไม่ใช่ Odoo จะข้ามไปเอง
+      - name: ตรวจ Odoo manifest และ XML
+        run: |
+          python - <<'PY'
+          import ast, pathlib, sys, xml.etree.ElementTree as ET
+
+          errors = []
+
+          manifests = list(pathlib.Path(".").rglob("__manifest__.py"))
+          for m in manifests:
+              try:
+                  data = ast.literal_eval(m.read_text(encoding="utf-8"))
+              except (ValueError, SyntaxError) as exc:
+                  errors.append(f"{m}: parse ไม่ผ่าน — {exc}")
+                  continue
+              if not isinstance(data, dict):
+                  errors.append(f"{m}: ต้องเป็น dict")
+                  continue
+              for key in ("name", "version", "depends"):
+                  if key not in data:
+                      errors.append(f"{m}: ขาด key '{key}'")
+              for path in data.get("data", []):
+                  if not (m.parent / path).exists():
+                      errors.append(f"{m}: อ้างถึงไฟล์ที่ไม่มีอยู่ — {path}")
+
+          xml_files = [p for p in pathlib.Path(".").rglob("*.xml") if ".git" not in p.parts]
+          for x in xml_files:
+              try:
+                  ET.parse(x)
+              except ET.ParseError as exc:
+                  errors.append(f"{x}: XML ไม่ well-formed — {exc}")
+
+          print(f"ตรวจ manifest {len(manifests)} ไฟล์, XML {len(xml_files)} ไฟล์")
+          for e in errors:
+              print(f"::error::{e}")
+          sys.exit(1 if errors else 0)
+          PY
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # ให้ตรงกับเวอร์ชันที่ใช้จริงบน production
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: ติดตั้ง dependency
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f pyproject.toml ]; then
+            pip install -e ".[dev]" || pip install -e .
+          fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pytest
+
+      - name: รัน test
+        run: pytest -q
+
+  # ---- gate: required status check ตัวเดียวของ repo นี้ ----
+  ci:
+    if: always()
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: สรุปผล
+        run: |
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "::error::มี job ก่อนหน้าไม่ผ่าน — ดูรายละเอียดที่ job ที่แดง"
+            exit 1
+          fi
+          echo "ผ่านทั้งหมด"

@@ -1,0 +1,43 @@
+# <ชื่อ repo>
+
+<หนึ่งประโยค: service นี้ทำอะไร ให้ใครใช้>
+
+## คำสั่งที่ใช้บ่อย
+
+```bash
+<install>      # เช่น uv sync / npm ci
+<test>         # เช่น pytest -q / npm test
+<lint>         # เช่น ruff check . / npm run lint
+<run>          # เช่น uvicorn app.main:app --reload
+```
+
+## โครงสร้าง
+
+```
+<dir>/     <หน้าที่ของชั้นนี้ — เขียนเฉพาะที่ดูชื่อโฟลเดอร์แล้วไม่รู้>
+```
+
+## กติกาของ repo นี้
+
+- <ข้อห้ามที่เฉพาะเจาะจง เช่น "ห้ามแก้ไฟล์ใน migrations/ ที่ merge ไปแล้ว ให้เพิ่มไฟล์ใหม่แทน">
+- <pattern ที่เลือกไว้ + เหตุผล เช่น "business logic อยู่ใน services/ เท่านั้น controller ห้ามแตะ DB ตรง">
+- <สิ่งที่เคยพลาดแล้วเจ็บ เช่น "ทุก endpoint ต้องมี timeout — เคยมี incident จากการเรียก ERP ค้าง">
+
+## ความสัมพันธ์กับ repo อื่น
+
+- ถูกเรียกโดย `<repo>` ผ่าน <HTTP/queue/DB ร่วม> — เปลี่ยน <schema/response> = breaking change
+- เรียก `<repo>` ผ่าน <ช่องทาง> — โค้ดที่ต่อไว้อยู่ที่ `<path>`
+
+> ถ้าจะเปลี่ยน contract อ่าน docs/05-multi-repo.md ก่อน — ต้องทำสามจังหวะ ห้ามเปลี่ยนแล้วปล่อย
+
+## ข้อตกลงการทำงาน
+
+- งานที่แตะเกิน 2 ไฟล์ → ใช้ plan mode และให้อนุมัติแผนก่อนแก้
+- ห้าม `git push`, `gh pr merge` — คนกดเอง
+- ห้ามเพิ่ม dependency ใหม่โดยไม่ถามก่อน
+- commit ตาม Conventional Commits (`feat:` `fix:` `refactor:` `perf:` `test:` `docs:` `chore:`)
+- ค่าที่ตั้งได้ต้องอ่านจาก env ห้าม hardcode — ดูรายการที่ `.env.example`
+
+## สิ่งที่ยังไม่เรียบร้อย (อ่านก่อนแก้ตรงนี้)
+
+- <หนี้ทางเทคนิคที่รู้ตัวอยู่ + สาเหตุ เช่น "adapters/legacy.py ยังไม่มี test เพราะต่อกับ ERP ตัวจริง">

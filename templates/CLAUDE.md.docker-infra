@@ -1,0 +1,50 @@
+# <ชื่อ repo> — infra / config
+
+<repo นี้เก็บอะไร deploy อะไร ไปที่ไหน>
+
+## สิ่งที่อยู่ใน repo นี้
+
+```
+compose/          docker compose ต่อ environment
+images/           Dockerfile ที่เรา build เอง
+config/           config ของ service ต่าง ๆ (ไม่มีค่าลับ)
+scripts/          สคริปต์ deploy / backup / restore
+```
+
+## คำสั่งที่ใช้บ่อย
+
+```bash
+docker compose -f compose/<env>.yml config      # ตรวจไฟล์ก่อนใช้จริง
+docker compose -f compose/<env>.yml up -d
+docker compose -f compose/<env>.yml logs -f <service>
+docker compose -f compose/<env>.yml ps
+```
+
+## กติกาของ repo นี้ — อ่านให้ครบก่อนแตะอะไร
+
+- **ห้ามมีค่าลับในไฟล์ใด ๆ ใน repo นี้** — ทุกค่าลับมาจาก env หรือ secret manager
+  ไฟล์ `.env` ต้องอยู่ใน `.gitignore` และมี `.env.example` ที่ระบุชื่อตัวแปรครบ (ค่าเป็นตัวอย่างเท่านั้น)
+- **ห้าม `docker compose down -v`** — `-v` ลบ volume คือลบฐานข้อมูล
+- **pin image tag เสมอ** ห้ามใช้ `latest` — `postgres:16.4` ไม่ใช่ `postgres:latest`
+  เพราะ `latest` ทำให้ restart ครั้งหน้าได้เวอร์ชันคนละตัวกับที่ทดสอบไว้
+- ทุก service ต้องมี `healthcheck` และ `restart: unless-stopped`
+- ห้าม publish port ออก host ถ้าไม่จำเป็น — ให้คุยกันผ่าน network ภายในของ compose
+- แก้ compose ของ production ต้องผ่าน PR และมีคนอนุมัติ ห้ามแก้บนเครื่อง server ตรง ๆ
+
+## ก่อน deploy ทุกครั้ง
+
+```bash
+docker compose -f compose/<env>.yml config >/dev/null   # ต้องไม่มี error
+./scripts/backup.sh                                     # backup ก่อนเสมอ
+```
+
+## ความสัมพันธ์กับ repo อื่น
+
+- deploy image จาก `<repo>` — เปลี่ยน tag ที่ `<path>`
+- <service ไหนแชร์ volume/network/DB กับใคร — ระบุให้ครบ ตรงนี้คือจุดที่พังข้ามทีมบ่อยที่สุด>
+
+## ข้อตกลงการทำงาน
+
+- ห้ามรันคำสั่งที่แตะ production
+- งานที่แตะเกิน 2 ไฟล์ → plan mode ก่อน
+- commit ตาม Conventional Commits

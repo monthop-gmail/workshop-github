@@ -1,0 +1,51 @@
+# <ชื่อ repo>
+
+<หนึ่งประโยค: ทำอะไร ให้ใครใช้>
+
+## สภาพแวดล้อม
+
+- Node `<version>` (ตรงกับ `.nvmrc`) / package manager: `<npm|pnpm|yarn>`
+- Framework: `<Next.js / NestJS / Express / ...>`
+
+## คำสั่งที่ใช้บ่อย
+
+```bash
+npm ci
+npm run dev
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+## โครงสร้าง
+
+```
+src/
+├── <domain>/        ตรรกะทางธุรกิจล้วน ไม่ import framework
+├── <app>/           use case / orchestration
+├── <infra>/         db client, http client, external service
+└── <routes|app>/    controller / route handler
+```
+
+## กติกาของ repo นี้
+
+- **ห้ามใช้ `any`** ถ้าไม่รู้ type ใช้ `unknown` แล้ว narrow ด้วย type guard
+- ข้อมูลที่มาจากภายนอก (req body, query, webhook, response ของ service อื่น)
+  ต้องผ่าน schema validation ก่อนเสมอ — ใช้ `<zod|valibot>` ที่ `<path>`
+- route handler ห้ามเรียก DB ตรง ให้ผ่านชั้น `<service|repository>`
+- ห้าม `catch` แล้วเงียบ — log พร้อม context แล้ว re-throw หรือแปลงเป็น error ที่มีความหมาย
+- error ที่ตอบกลับผู้ใช้ห้ามมี stack trace หรือข้อความจาก DB
+- ห้ามเพิ่ม dependency ใหม่โดยไม่ถาม — เช็คก่อนว่าของที่มีอยู่ทำได้ไหม
+
+## ความสัมพันธ์กับ repo อื่น
+
+- ถูกเรียกโดย `<repo>` ผ่าน HTTP — เปลี่ยน response schema = breaking change
+- เรียก `<repo>` — client อยู่ที่ `<path>` มี type ที่ generate จาก `<openapi spec>`
+
+## ข้อตกลงการทำงาน
+
+- งานที่แตะเกิน 2 ไฟล์ → plan mode ก่อน
+- ห้าม `git push`, `gh pr merge`
+- commit ตาม Conventional Commits
+- ค่าที่ตั้งได้ต้องอ่านจาก env และประกาศไว้ใน `.env.example`

@@ -1,0 +1,57 @@
+name: Bug report
+description: รายงานพฤติกรรมที่ผิดจากที่ควรเป็น
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: เกิดอะไรขึ้น
+      description: อธิบายสิ่งที่เห็นจริง ไม่ใช่สิ่งที่คิดว่าเป็นสาเหตุ
+      placeholder: กด "บันทึกใบสั่งซื้อ" แล้วขึ้น 500 ทุกครั้งที่ยอดรวมเป็น 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ควรจะเป็นยังไง
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: ทำซ้ำยังไง
+      description: ถ้าทำซ้ำไม่ได้ ให้บอกว่าเจอกี่ครั้งจากกี่ครั้ง
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: เจอที่ไหน
+      placeholder: production / staging / เครื่อง dev — พร้อมเวอร์ชันหรือ commit sha
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log / error
+      description: ลบ token, รหัสผ่าน และข้อมูลลูกค้าออกก่อนวาง
+      render: shell
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: ความรุนแรง
+      options:
+        - ผู้ใช้ทำงานต่อไม่ได้เลย
+        - ทำงานต่อได้แต่ต้องเลี่ยง
+        - รำคาญแต่ไม่กระทบงาน
+    validations:
+      required: true

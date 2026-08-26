@@ -1,0 +1,31 @@
+name: Feature request
+description: เสนอความสามารถใหม่หรือการเปลี่ยนแปลง
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: ปัญหาที่อยากแก้
+      description: เริ่มจากปัญหา อย่าเริ่มจากวิธีแก้ — ถ้าเริ่มจากวิธีแก้ เราจะพลาดทางที่ดีกว่า
+      placeholder: ทีมบัญชีต้อง export CSV แล้วมานั่งรวมมือทุกสิ้นเดือน ใช้เวลา 3 ชั่วโมง
+    validations:
+      required: true
+
+  - type: textarea
+    id: who
+    attributes:
+      label: ใครได้ประโยชน์ และบ่อยแค่ไหน
+      placeholder: ทีมบัญชี 4 คน เดือนละครั้ง
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: แนวทางที่คิดไว้ (ถ้ามี)
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: กระทบ repo อื่นไหม
+      description: ถ้าต้องเปลี่ยน API หรือ schema ให้ระบุ repo ที่เรียกใช้อยู่

@@ -1,0 +1,53 @@
+# <ชื่อ repo> — Odoo addons
+
+<addons ชุดนี้ทำอะไร ใช้กับ Odoo เวอร์ชันไหน>
+
+## สภาพแวดล้อม
+
+- Odoo `<version>` / Python `<version>` / PostgreSQL `<version>`
+- addons path: `<path>`
+- รันด้วย docker compose — service ชื่อ `<odoo>` และ `<db>`
+
+## คำสั่งที่ใช้บ่อย
+
+```bash
+docker compose up -d
+docker compose logs -f odoo
+docker compose exec odoo odoo -d <db> -u <module> --stop-after-init          # อัปเดตโมดูล
+docker compose exec odoo odoo -d <db> -i <module> --test-enable --stop-after-init  # รัน test
+ruff check .
+```
+
+## กติกาของ repo นี้
+
+- **ห้ามแก้ไฟล์ใน `<module>/migrations/` ที่ deploy ไปแล้ว** ให้เพิ่มสคริปต์เวอร์ชันใหม่แทน
+- ทุกครั้งที่เพิ่ม/ลบ field ในโมเดล ต้องเพิ่ม migration script — Odoo ไม่ลบคอลัมน์ให้เอง
+- `__manifest__.py` ต้องระบุ `depends` ให้ครบ — โมดูลที่ import ข้ามกันโดยไม่ประกาศ depends
+  จะพังเฉพาะบนเครื่องที่ติดตั้งใหม่ ไม่พังบนเครื่อง dev
+- ห้ามเรียก `self.env.cr.execute()` ด้วย SQL ที่ต่อจาก string — ใช้ parameter binding เสมอ
+- View XML ต้องมี `<record id>` ที่ไม่ซ้ำ และใช้ prefix ชื่อโมดูล
+- ห้ามแก้ core addons ของ Odoo — ให้ inherit แทน (`_inherit`)
+
+## โครงสร้างโมดูล
+
+```
+<module>/
+├── __manifest__.py
+├── models/          ตรรกะทางธุรกิจ
+├── views/           XML — ต้องประกาศใน __manifest__.data
+├── security/        ir.model.access.csv + record rules (ห้ามลืม ไม่งั้นใครก็อ่านได้)
+├── data/            master data ที่โหลดตอนติดตั้ง
+└── migrations/      สคริปต์อัปเกรดตามเวอร์ชัน
+```
+
+## ความสัมพันธ์กับ repo อื่น
+
+- ถูกเรียกจาก `<repo>` ผ่าน XML-RPC / REST — เปลี่ยนชื่อ field = breaking change
+- <ถ้ามี service ภายนอกที่แชร์ DB เดียวกัน ให้ระบุตรงนี้ เพราะมันเป็นจุดที่พังเงียบที่สุด>
+
+## ข้อตกลงการทำงาน
+
+- งานที่แตะเกิน 2 ไฟล์ → plan mode ก่อน
+- ห้ามรันคำสั่งที่แตะฐานข้อมูล production
+- ห้าม `docker compose down -v` (ลบ volume = ข้อมูล dev หายหมด)
+- commit ตาม Conventional Commits

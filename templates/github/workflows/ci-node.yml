@@ -1,0 +1,84 @@
+# ก๊อปไปวางที่ .github/workflows/ci.yml
+#
+# required status check ที่ต้องตั้งใน ruleset คือ "ci" (job สุดท้าย) เท่านั้น
+# script ที่ยังไม่มีใน package.json จะถูกข้ามด้วย --if-present ไม่ทำให้ CI แดง
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ถ้า repo ยังไม่มี .nvmrc ให้ใช้ค่าเริ่มต้น แล้วไปเพิ่มไฟล์นี้ทีหลัง
+      # (มี .nvmrc = เครื่อง dev กับ CI ใช้ Node เวอร์ชันเดียวกันแน่นอน)
+      - name: กำหนดเวอร์ชัน Node
+        run: |
+          if [ ! -f .nvmrc ]; then
+            echo "::warning::ไม่พบ .nvmrc — ใช้ Node 22 ไปก่อน ควรเพิ่มไฟล์ .nvmrc ลง repo"
+            echo "22" > .nvmrc
+          fi
+          echo "Node $(cat .nvmrc)"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+
+      - name: ติดตั้ง dependency
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Typecheck
+        run: npm run typecheck --if-present
+
+      - name: Test
+        run: npm test --if-present
+
+      - name: Build
+        run: npm run build --if-present
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: กำหนดเวอร์ชัน Node
+        run: '[ -f .nvmrc ] || echo "22" > .nvmrc'
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+
+      # แดงเฉพาะช่องโหว่ระดับ high ขึ้นไป — moderate เยอะเกินจนคนเลิกสนใจ
+      - name: ตรวจช่องโหว่ใน dependency
+        run: npm audit --audit-level=high
+
+  # ---- gate: required status check ตัวเดียวของ repo นี้ ----
+  ci:
+    if: always()
+    needs: [verify, audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: สรุปผล
+        run: |
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "::error::มี job ก่อนหน้าไม่ผ่าน — ดูรายละเอียดที่ job ที่แดง"
+            exit 1
+          fi
+          echo "ผ่านทั้งหมด"

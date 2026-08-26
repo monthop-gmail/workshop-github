@@ -153,6 +153,34 @@ git switch main && echo x >> README.md && git commit -am 'test' && git push
 git reset --hard origin/main
 ```
 
+### ข้อจำกัดตามแผนของ GitHub
+
+**branch protection / rulesets ใช้กับ private repo ไม่ได้บนแผนฟรี** ต้องเป็น GitHub Pro/Team/Enterprise
+บน public repo ใช้ได้ทุกแผน
+
+เช็คว่า repo ไหนติดข้อจำกัดนี้:
+
+```bash
+gh api repos/OWNER/REPO/rules/branches/main
+# → 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
+
+`audit-repos.sh` จะแสดงเป็น `n/a` ไม่ใช่ `no` — เพราะสองอย่างนี้ต้องแก้คนละวิธี
+`no` = ไปตั้งซะ · `n/a` = ต้องอัปเกรดแผน หรือเปลี่ยน repo เป็น public
+
+ตารางฟีเจอร์ความปลอดภัยบนแผนฟรี:
+
+| | public | private |
+| --- | --- | --- |
+| branch protection / rulesets | ใช้ได้ | **ใช้ไม่ได้** |
+| secret scanning + push protection | ใช้ได้ | ใช้ไม่ได้ (ต้องมี Advanced Security) |
+| code scanning (CodeQL) | ใช้ได้ | ใช้ไม่ได้ (ต้องมี Advanced Security) |
+| Dependabot alerts + security updates | ใช้ได้ | **ใช้ได้** |
+| Actions | ไม่จำกัด | กินโควตาของแผน |
+
+ถ้า repo เป็น private บนแผนฟรี สิ่งที่ทำได้คือเอา `gitleaks` กับ `pip-audit`/`npm audit`
+ไปเป็น job ใน CI แทน — ได้ผลใกล้เคียงแต่ต้องดูแลเอง
+
 ### ระวังตอนเริ่มใช้
 
 - ถ้ามี bot/CI ที่ push ตรงเข้า main อยู่ ต้องใส่ bypass ให้มันก่อน ไม่งั้น pipeline พัง

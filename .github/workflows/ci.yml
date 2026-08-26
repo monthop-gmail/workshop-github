@@ -9,6 +9,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # สั่งรันเองได้จากหน้า Actions เวลาอยากเช็คซ้ำโดยไม่ต้อง push อะไร
+  workflow_dispatch:
 
 permissions:
   contents: read

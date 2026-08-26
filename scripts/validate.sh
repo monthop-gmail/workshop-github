@@ -11,7 +11,7 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$(dirname "$SCRIPT_DIR")"
+cd "$(dirname "$SCRIPT_DIR")" || exit 1
 
 if [ -t 1 ]; then
   GREEN=$'\033[32m'; RED=$'\033[31m'; DIM=$'\033[2m'; RESET=$'\033[0m'
@@ -135,8 +135,12 @@ check_shell() {
     for f in scripts/*.sh; do
       if shellcheck -S warning -f gcc "$f"; then ok "$f"; else fail=1; fi
     done
+  elif [ -n "${GITHUB_ACTIONS:-}" ]; then
+    # ใน CI ต้องมีเสมอ — ถ้าหายไปแปลว่า runner เปลี่ยน อย่าปล่อยผ่านเงียบ ๆ
+    err "scripts/" "ไม่พบ shellcheck บน runner"
   else
-    echo "  ${DIM}(ไม่มี shellcheck บนเครื่องนี้ — ข้าม ติดตั้ง: apt install shellcheck)${RESET}"
+    printf '  %s(ไม่มี shellcheck บนเครื่องนี้ — ข้ามไปก่อน แต่ CI จะรันให้ ถ้าไม่อยากให้ PR แดง\n' "$DIM"
+    printf '   ติดตั้งด้วย: sudo apt install shellcheck)%s\n' "$RESET"
   fi
 
   head_ "scripts: ต้องรันได้ (mode 100755)"

@@ -1,0 +1,74 @@
+# CI ของ repo นี้เอง — ตรวจว่า template ที่แจกให้ทีมยังใช้งานได้จริง
+#
+# required status check ใน branch protection คือ "ci" (job สุดท้าย) เท่านั้น
+# ทุก job เรียก scripts/validate.sh ตัวเดียวกับที่รันบนเครื่อง —
+# จะได้ไม่มีอาการ "บนเครื่องเขียว บน CI แดง"
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  templates:
+    name: template ใช้งานได้จริง
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - name: ตรวจ YAML/JSON และ gate job ของทุก ci-*.yml
+        run: ./scripts/validate.sh templates
+
+  shell:
+    name: script รันได้
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # ล้มให้ดังถ้าไม่มี shellcheck — ดีกว่าปล่อยให้ validate.sh ข้ามไปเงียบ ๆ
+      - name: ยืนยันว่ามี shellcheck
+        run: shellcheck --version
+
+      - name: ตรวจ syntax, shellcheck และ executable bit
+        run: ./scripts/validate.sh shell
+
+  docs:
+    name: เอกสารและข้อมูลที่เปิดเผยได้
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: ตรวจลิงก์ภายในและข้อมูลที่ไม่ควรหลุด
+        run: ./scripts/validate.sh docs
+
+  # ---- gate: required status check ตัวเดียวของ repo นี้ ----
+  ci:
+    if: always()
+    needs: [templates, shell, docs]
+    runs-on: ubuntu-latest
+    steps:
+      - name: สรุปผล
+        run: |
+          if ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}; then
+            echo "::error::มี job ก่อนหน้าไม่ผ่าน — ดูรายละเอียดที่ job ที่แดง"
+            exit 1
+          fi
+          echo "ผ่านทั้งหมด"

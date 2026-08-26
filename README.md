@@ -56,7 +56,23 @@ scripts/      เครื่องมือติดตั้ง/ตรวจ�
               bootstrap-repo.sh  ติดตั้ง template ลง repo
               apply-ruleset.sh   เปิด branch protection
               audit-repos.sh     สแกนทั้ง org ว่าขาดอะไร
+              validate.sh        ตรวจ repo นี้เอง (CI เรียกตัวเดียวกัน)
 ```
+
+## แก้ repo นี้เอง
+
+repo นี้ก็ทำตามกติกาของตัวเอง — ทุกอย่างเข้าผ่าน PR ที่ CI เขียว
+
+```bash
+git switch -c docs/แก้อะไรสักอย่าง
+# ...แก้...
+./scripts/validate.sh          # รันตัวเดียวกับที่ CI รัน
+gh pr create --fill
+```
+
+`validate.sh` ตรวจ: YAML/JSON ใน `templates/` ใช้ได้จริง · ทุก `ci-*.yml` มี gate job ชื่อ `ci`
+ที่รอครบทุก job และมี `if: always()` · `scripts/*.sh` ผ่าน shellcheck และมี executable bit ·
+ลิงก์ภายในไม่ตาย · ไม่มี token หรืออีเมลจริงหลุดเข้า repo สาธารณะ
 
 ## สิ่งที่ต้องมีก่อน
 

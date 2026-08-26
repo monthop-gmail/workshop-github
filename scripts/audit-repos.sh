@@ -59,7 +59,13 @@ path_exists() {
   gh api "repos/$1/contents/$2" --silent >/dev/null 2>&1
 }
 
-mark() { [ "$1" -eq 1 ] && printf 'yes' || printf '**no**'; }
+mark() {
+  case "$1" in
+    1)  printf 'yes' ;;
+    na) printf '_n/a_' ;;   # ฟีเจอร์ใช้ไม่ได้บนแผนนี้ ไม่ใช่ "ยังไม่ได้ตั้ง"
+    *)  printf '**no**' ;;
+  esac
+}
 
 while IFS=$'\t' read -r name branch; do
   [ -n "$name" ] || continue
@@ -76,7 +82,7 @@ while IFS=$'\t' read -r name branch; do
 
   tree=$(gh api "repos/$nwo/git/trees/$branch?recursive=1" 2>/dev/null || true)
 
-  if [ -n "$tree" ] && [ "$(printf '%s' "$tree" | jq -r '.truncated // false')" = "false" ]; then
+  if [ -n "$tree" ] && printf '%s' "$tree" | jq -e 'has("tree") and (.truncated // false | not)' >/dev/null 2>&1; then
     paths=$(printf '%s' "$tree" | jq -r '.tree[].path')
     printf '%s\n' "$paths" | grep -qx 'CLAUDE.md' && has_claude=1
     printf '%s\n' "$paths" | grep -qxE '(\.github/|docs/)?CODEOWNERS' && has_owners=1
@@ -90,10 +96,21 @@ while IFS=$'\t' read -r name branch; do
     [ -n "$(gh api "repos/$nwo/contents/.github/workflows" --jq 'length' 2>/dev/null || true)" ] && has_ci=1
   fi
 
-  rule_types=$(gh api "repos/$nwo/rules/branches/$branch" --jq '[.[].type] | unique | join(",")' 2>/dev/null || true)
-  [ -n "$rule_types" ] && [ "$rule_types" != "" ] && has_rules=1
+  # ระวัง: บน private repo ของแผนฟรี API ตอบ 403 พร้อม body เป็น JSON object
+  # ถ้าเอา body มานับตรง ๆ จะกลายเป็น "มี protection" ทั้งที่ตั้งไม่ได้เลย
+  # เก็บทั้ง stdout และ stderr ไว้ก่อน อย่าต่อ pipe ตรงจาก gh —
+  # pipefail จะทำให้ pipeline ล้มตาม exit code ของ gh ก่อนที่ grep จะได้ทำงาน
+  rules_out=$(gh api "repos/$nwo/rules/branches/$branch" 2>&1 || true)
+  if printf '%s' "$rules_out" | jq -e 'type == "array"' >/dev/null 2>&1; then
+    [ "$(printf '%s' "$rules_out" | jq 'length')" -gt 0 ] && has_rules=1
+  elif printf '%s' "$rules_out" | grep -q 'Upgrade to GitHub'; then
+    # แผนไม่รองรับ — ต่างจาก "ยังไม่ได้ตั้ง" อย่างสิ้นเชิง
+    has_rules=na
+  fi
 
-  total_missing=$(( (1 - has_claude) + (1 - has_owners) + (1 - has_prtpl) + (1 - has_ci) + (1 - has_rules) ))
+  rules_missing=0
+  [ "$has_rules" = "0" ] && rules_missing=1
+  total_missing=$(( (1 - has_claude) + (1 - has_owners) + (1 - has_prtpl) + (1 - has_ci) + rules_missing ))
   [ "$total_missing" -gt 0 ] && missing_total=$((missing_total + 1))
 
   if [ "$only_missing" -eq 1 ] && [ "$total_missing" -eq 0 ]; then
@@ -118,6 +135,9 @@ EOF
 printf '%s' "$rows"
 
 cat <<EOF
+
+_n/a_ = ฟีเจอร์ใช้ไม่ได้บนแผนปัจจุบัน ไม่ใช่ "ยังไม่ได้ตั้ง"
+branch protection ของ private repo ต้องใช้ GitHub Pro/Team ขึ้นไป — บนแผนฟรีใช้ได้เฉพาะ public repo
 
 ## เติมส่วนที่ขาด
 

@@ -158,6 +158,10 @@ gh api -X POST orgs/myorg/rulesets --input templates/rulesets/org-main-protectio
 ข้อควรรู้: กฎระดับ org **บวกเพิ่ม**กับกฎระดับ repo ไม่ได้ทับกัน — repo เข้มกว่าได้ แต่หย่อนกว่าไม่ได้
 เริ่มด้วย `"enforcement": "evaluate"` เพื่อดูผลก่อนบังคับจริง แล้วค่อยเปลี่ยนเป็น `"active"`
 
+> ⚠️ **บนแผนฟรี กฎจะมีผลกับ public repo เท่านั้น** — private repo ต้องมีแผน Team ขึ้นไป
+> ดูตารางเต็มว่าอะไรใช้ได้บ้างตาม visibility และประเภทบัญชีที่
+> [04 — ข้อจำกัดตามแผนและ visibility](04-ci-branch-protection.md)
+
 ---
 
 ## 5.5 ใช้ Claude Code กับหลาย repo

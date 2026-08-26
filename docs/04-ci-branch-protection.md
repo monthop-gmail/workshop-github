@@ -153,33 +153,84 @@ git switch main && echo x >> README.md && git commit -am 'test' && git push
 git reset --hard origin/main
 ```
 
-### ข้อจำกัดตามแผนของ GitHub
+### ข้อจำกัดตามแผนและ visibility
 
-**branch protection / rulesets ใช้กับ private repo ไม่ได้บนแผนฟรี** ต้องเป็น GitHub Pro/Team/Enterprise
-บน public repo ใช้ได้ทุกแผน
+คำถามที่ทีมถามบ่อยที่สุดคือ "ถ้าย้ายไปบัญชีอื่น หรือปิดเป็น private จะได้อะไร เสียอะไร"
+คำตอบสั้น ๆ:
 
-เช็คว่า repo ไหนติดข้อจำกัดนี้:
+> **public/private เป็นตัวตัดสินเกือบทุกอย่าง · org/personal แทบไม่เกี่ยว**
+
+ตารางข้างล่างมาจากการทดสอบจริงกับ repo ทั้ง 4 แบบบนแผนฟรี ไม่ใช่จากเอกสารอย่างเดียว
+
+#### ฟีเจอร์ความปลอดภัยบนแผนฟรี
+
+| ฟีเจอร์ | personal + public | personal + private | org + public | org + private |
+| --- | :---: | :---: | :---: | :---: |
+| branch protection / rulesets | ได้ | **ไม่ได้** | ได้ | **ไม่ได้** |
+| secret scanning | ได้ | **ไม่ได้** | ได้ | **ไม่ได้** |
+| push protection (บล็อกตอน push) | ได้ | **ไม่ได้** | ได้ | **ไม่ได้** |
+| code scanning (CodeQL) | ได้ | **ไม่ได้** | ได้ | **ไม่ได้** |
+| private vulnerability reporting | ได้ | **ไม่ได้** | ได้ | **ไม่ได้** |
+| Dependabot alerts + security updates | ได้ | **ได้** | ได้ | **ได้** |
+| Actions | ไม่จำกัด | กินโควตา | ไม่จำกัด | กินโควตา |
+| `gitleaks` ผ่าน docker ใน CI | ได้ | ได้ | ได้ | ได้ |
+| `pip-audit` / `npm audit` ใน CI | ได้ | ได้ | ได้ | ได้ |
+
+**คอลัมน์ที่ 1 กับ 3 เหมือนกันทุกแถว และคอลัมน์ที่ 2 กับ 4 ก็เหมือนกันทุกแถว** —
+การย้าย repo จาก org ไปบัญชีส่วนตัว (หรือกลับกัน) ไม่เปลี่ยนอะไรเลยเรื่องความปลอดภัย
+
+สิ่งที่ต้องจ่ายเพิ่มถึงจะได้บน private:
+
+| ต้องการ | ต้องมี |
+| --- | --- |
+| branch protection บน private | GitHub Pro (บัญชีส่วนตัว) หรือ Team (org) |
+| secret scanning + CodeQL บน private | GitHub Advanced Security (แพงกว่ามาก) |
+
+#### สิ่งที่ต่างกันจริงระหว่าง org กับบัญชีส่วนตัว
+
+| | personal | org |
+| --- | --- | --- |
+| `CODEOWNERS` ใช้ `@org/team` ได้ | ไม่ได้ — ใส่ได้แค่ชื่อคน | **ได้** |
+| org-level ruleset (ตั้งทีเดียวครอบทุก repo) | ไม่มี concept นี้ | มี (private ต้องมีแผน Team ขึ้นไป) |
+| org-level secret (`gh secret set --org`) | ไม่ได้ | **ได้** |
+| `gitleaks/gitleaks-action` | ใช้ฟรี | **ต้องมี `GITLEAKS_LICENSE`** |
+| จัดสิทธิ์เป็นทีม / audit log | ไม่ได้ | ได้ |
+
+`gitleaks-action` เป็นข้อเดียวที่ org แย่กว่า — เลี่ยงด้วยการเรียก CLI ผ่าน docker แทน
+ซึ่งกลายเป็นดีกว่าเพราะ pin เวอร์ชันได้และใช้ได้เหมือนกันทุกที่:
+
+```yaml
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # ต้องเห็นทั้ง history ไม่งั้นจับ secret ที่ commit แล้วลบทีหลังไม่ได้
+
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 \
+            git /repo --no-banner --redact --exit-code 1
+```
+
+`--redact` ห้ามลืม — ไม่งั้น secret ที่เจอจะถูกพิมพ์ลง log ของ Actions
+ซึ่งบน public repo ใครก็อ่านได้ เครื่องมือกันรั่วจะกลายเป็นตัวรั่วเสียเอง
+
+#### เช็คว่า repo ไหนติดข้อจำกัดนี้
 
 ```bash
 gh api repos/OWNER/REPO/rules/branches/main
 # → 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
 ```
 
-`audit-repos.sh` จะแสดงเป็น `n/a` ไม่ใช่ `no` — เพราะสองอย่างนี้ต้องแก้คนละวิธี
+`audit-repos.sh` แสดงเป็น `n/a` ไม่ใช่ `no` เพราะสองอย่างนี้แก้คนละวิธี —
 `no` = ไปตั้งซะ · `n/a` = ต้องอัปเกรดแผน หรือเปลี่ยน repo เป็น public
 
-ตารางฟีเจอร์ความปลอดภัยบนแผนฟรี:
+#### สรุปวิธีตัดสินใจ
 
-| | public | private |
-| --- | --- | --- |
-| branch protection / rulesets | ใช้ได้ | **ใช้ไม่ได้** |
-| secret scanning + push protection | ใช้ได้ | ใช้ไม่ได้ (ต้องมี Advanced Security) |
-| code scanning (CodeQL) | ใช้ได้ | ใช้ไม่ได้ (ต้องมี Advanced Security) |
-| Dependabot alerts + security updates | ใช้ได้ | **ใช้ได้** |
-| Actions | ไม่จำกัด | กินโควตาของแผน |
-
-ถ้า repo เป็น private บนแผนฟรี สิ่งที่ทำได้คือเอา `gitleaks` กับ `pip-audit`/`npm audit`
-ไปเป็น job ใน CI แทน — ได้ผลใกล้เคียงแต่ต้องดูแลเอง
+- **อย่าปิดเป็น private เพื่อความปลอดภัย** — บนแผนฟรีมันทำให้แย่ลง เพราะเสียเครื่องมือตรวจ 5 ตัว
+  เหลือแค่ Dependabot · ปิดเพราะเป็นความลับทางธุรกิจได้ แต่นั่นคือการตัดสินใจเชิงธุรกิจ
+- **ถ้าจำเป็นต้อง private** ให้เอา `gitleaks` + `pip-audit` ไปเป็น job ใน CI ทดแทน
+  ไม่งั้นจะกลายเป็นปิดตาแล้วรู้สึกปลอดภัยขึ้น ทั้งที่มองไม่เห็นอะไรเลย
+- **ถ้าจะจ่ายเพิ่ม** GitHub Team ที่ระดับ org คุ้มกว่าซื้อ Pro รายคน เพราะได้ทั้ง
+  branch protection บน private ทุก repo และ org-level ruleset ที่ตั้งครั้งเดียวครอบทุก repo
 
 ### ระวังตอนเริ่มใช้
 

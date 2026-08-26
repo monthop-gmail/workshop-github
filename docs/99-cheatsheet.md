@@ -98,6 +98,7 @@ reflog กู้ได้เกือบทุกอย่างที่เค�
 | `refusing to allow an OAuth App to create or update workflow` | token ไม่มี scope `workflow` | `gh auth refresh -h github.com -s workflow` |
 | push แล้วขึ้น `protected branch hook declined` | กำลัง push ตรงเข้า main | ถูกแล้ว — เปิด branch + PR |
 | PR merge ไม่ได้ ปุ่มเทา ทั้งที่ CI เขียว | มี review thread ที่ยังไม่ resolve / branch ไม่ up-to-date | resolve ให้หมด แล้ว `gh pr update-branch 142` |
+| เปิด PR แล้วไม่มี check ขึ้นเลย (repo เพิ่งสร้าง) | GitHub ยังไม่ register workflow เพราะยังไม่เคยมีบน default branch | merge workflow เข้า main รอบแรกก่อน แล้วค่อยตั้ง required check — ดู [04](04-ci-branch-protection.md) |
 | required check ค้าง "Expected — Waiting for status" | ชื่อ check ใน ruleset ไม่ตรงกับชื่อ job จริง | เทียบชื่อกับ `gh pr checks` แล้วแก้ ruleset — ดู [04](04-ci-branch-protection.md) |
 | CI ผ่านบนเครื่อง แต่แดงบน GitHub | เวอร์ชัน runtime / env var ต่างกัน | pin เวอร์ชันใน workflow ให้ตรงกับ local แล้วดู `gh run view --log-failed` |
 | commit ไม่ขึ้น contribution graph | `user.email` ไม่ตรงกับอีเมลที่ verified บน GitHub | ดู [01](01-setup.md) |

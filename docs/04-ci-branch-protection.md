@@ -16,6 +16,41 @@
 ถ้าตั้ง required check ก่อนที่ CI จะเสถียร ทีมจะติดแหง็ก merge อะไรไม่ได้เลย
 แล้วคนจะขอปิด protection ทิ้ง — จบเห่
 
+### ข้อยกเว้น: repo ที่เพิ่งสร้างใหม่
+
+**repo ที่ยังไม่เคยมี workflow อยู่บน default branch เลย จะไม่รัน CI ให้ ถึงไฟล์จะอยู่บน branch ของ PR แล้วก็ตาม**
+
+อาการ: เปิด PR ที่เพิ่ม `.github/workflows/ci.yml` เข้ามา แต่ไม่มี check ขึ้นเลย
+
+```bash
+gh api repos/OWNER/REPO/actions/runs --jq .total_count        # → 0
+gh api repos/OWNER/REPO/actions/workflows --jq '.workflows | length'  # → 0
+gh api repos/OWNER/REPO/actions/permissions --jq .enabled     # → true (Actions ไม่ได้ปิด)
+```
+
+ทั้งสามบรรทัดบอกตรงกันว่า GitHub ยัง**ไม่รู้จัก** workflow นี้ ไม่ใช่ว่ามันรันแล้วพัง
+
+ทางออก — ยอมรับว่ารอบแรกต้อง merge โดยที่ CI ยังไม่เคยเขียว:
+
+```
+1. merge PR ที่เพิ่ม workflow เข้า main (CI ยังไม่รัน — ปกติ)
+2. GitHub register workflow แล้วรันจาก trigger push:main
+3. ตรวจว่า run แรกเขียวจริง และจดชื่อ check ที่ได้
+4. ค่อยตั้ง required check
+```
+
+**อย่าตั้ง required check ก่อนเห็น run แรกสำเร็จ** ไม่งั้น repo จะ merge อะไรไม่ได้เลย
+เพราะ check ที่ไม่เคยมีอยู่จริงจะค้างที่ `Expected — Waiting for status` ตลอดกาล
+
+ตรวจชื่อ check ที่ใช้ได้จริงหลัง run แรกจบ:
+
+```bash
+gh api "repos/OWNER/REPO/commits/$(git rev-parse main)/check-runs" \
+  --jq '.check_runs[] | "\(.name) → \(.conclusion)"'
+```
+
+ชื่อที่เอาไปใส่ `--checks` ต้องตรงกับคอลัมน์ซ้ายเป๊ะ ๆ รวมทั้งตัวพิมพ์เล็กใหญ่
+
 ---
 
 ## 4.2 ปัญหาที่ทุกคนเจอ: ชื่อ check ไม่นิ่ง
